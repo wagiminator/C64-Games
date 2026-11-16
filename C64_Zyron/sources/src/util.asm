@@ -1,0 +1,306 @@
+; =====================================================================
+;  Utilities
+; =====================================================================
+
+print   .macro text, col, row, color
+        lda #<\text
+        sta ptr0
+        lda #>\text
+        sta ptr0+1
+        lda #\col
+        sta tmp0
+        lda #\row
+        sta tmp1
+        lda #\color
+        sta tmp2
+        jsr print_at
+        .endm
+
+; ptr0 = zero terminated text, tmp0 = col, tmp1 = row, tmp2 = colour
+print_at
+        ldy tmp1
+        lda rowlo,y
+        clc
+        adc tmp0
+        sta ptr1
+        sta ptr2
+        lda rowhiA,y
+        adc #0
+        sta ptr1+1
+        lda rowlo,y
+        clc
+        adc tmp0
+        lda rowhiC,y
+        adc #0
+        sta ptr2+1
+        ldy #0
+-       lda (ptr0),y
+        beq +
+        sta (ptr1),y
+        lda tmp2
+        sta (ptr2),y
+        iny
+        bne -
++       rts
+
+; print centred: ptr0 = text, tmp1 = row, tmp2 = colour
+print_centre
+        ldy #0
+-       lda (ptr0),y
+        beq +
+        iny
+        bne -
++       tya
+        lsr
+        sta tmp0
+        lda #20
+        sec
+        sbc tmp0
+        sta tmp0
+        jmp print_at
+
+; clear screen A (all 25 rows) with spaces, colour A
+clear_screen
+        ldx #0
+-       sta COLRAM,x
+        sta COLRAM+256,x
+        sta COLRAM+512,x
+        sta COLRAM+768-24,x
+        pha
+        lda #32
+        sta SCRA,x
+        sta SCRA+256,x
+        sta SCRA+512,x
+        sta SCRA+768-24,x
+        pla
+        inx
+        bne -
+        rts
+
+; ---------------------------------------------------- joystick (port 2) -> A active high
+DBGJOY = $03fe
+joyread
+        lda $dc00
+        eor #$ff
+        and #$1f
+        ora DBGJOY
+        rts
+
+; ---------------------------------------------------- random (16 bit LFSR)
+rnd     lda rndseed
+        asl
+        rol rndseed2
+        bcc +
+        eor #$2d
++       sta rndseed
+        eor rndseed2
+        rts
+
+; ---------------------------------------------------- aim at player
+; in: tmp0 = source cx2, tmp1 = source cy ; out A = angle 0..63
+aim
+        lda pcx2
+        lsr
+        sta tmp2
+        lda tmp0
+        lsr
+        sta tmp3
+        lda tmp2
+        sec
+        sbc tmp3
+        sta tmp2                ; dx (signed)
+        lda pcy
+        lsr
+        lsr
+        sta tmp3
+        lda tmp1
+        lsr
+        lsr
+        sta tmp4
+        lda tmp3
+        sec
+        sbc tmp4
+        sta tmp3                ; dy (signed)
+        lda #0
+        sta tmp4                ; flags
+        lda tmp2
+        bpl +
+        eor #$ff
+        clc
+        adc #1
+        sta tmp2
+        lda #1
+        sta tmp4
++       lda tmp3
+        bpl +
+        eor #$ff
+        clc
+        adc #1
+        sta tmp3
+        lda tmp4
+        ora #2
+        sta tmp4
++
+-       lda tmp2
+        ora tmp3
+        cmp #16
+        bcc +
+        lsr tmp2
+        lsr tmp3
+        jmp -
++       lda tmp3
+        asl
+        asl
+        asl
+        asl
+        ora tmp2
+        tay
+        lda atan16,y
+        sta tmp2
+        lda tmp4
+        and #1
+        beq +
+        lda #32
+        sec
+        sbc tmp2
+        sta tmp2
++       lda tmp4
+        and #2
+        beq +
+        lda #64
+        sec
+        sbc tmp2
+        sta tmp2
++       lda tmp2
+        and #63
+        rts
+
+; ---------------------------------------------------- score (BCD)
+; A = lo, X = mid (units of 10 points)
+score_add
+        sed
+        clc
+        adc score
+        sta score
+        txa
+        adc score+1
+        sta score+1
+        lda score+2
+        adc #0
+        sta score+2
+        cld
+        lda #1
+        sta hudflag
+        lda score+2
+        cmp nextext+2
+        bcc _r
+        bne _ext
+        lda score+1
+        cmp nextext+1
+        bcc _r
+_ext    sed
+        lda nextext+1
+        clc
+        adc #$50
+        sta nextext+1
+        lda nextext+2
+        adc #0
+        sta nextext+2
+        cld
+        lda lives
+        cmp #9
+        bcs _r
+        inc lives
+        lda #SFX_EXTRA
+        jsr sfx_start
+_r      rts
+
+; ---------------------------------------------------- 16/8 division
+; tmp0/tmp1 = dividend, tmp2 = divisor -> tmp0/tmp1 = quotient
+div16_8
+        lda #0
+        ldy #16
+-       asl tmp0
+        rol tmp1
+        rol
+        bcs +
+        cmp tmp2
+        bcc ++
++       sbc tmp2
+        inc tmp0
++       dey
+        bne -
+        rts
+
+; ---------------------------------------------------- keyboard
+; A = keycode (col*8+row) -> A = 1 if pressed else 0  (preserves Y)
+keytest
+        sta keytmp
+        lsr
+        lsr
+        lsr
+        tax
+        lda colsel,x
+        sta $dc00
+        lda keytmp
+        and #7
+        tax
+        lda $dc01
+        and bittab,x
+        ldx #$ff
+        stx $dc00
+        cmp #1
+        lda #0
+        bcs +
+        lda #1
++       rts
+colsel  .byte $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+
+; full scan -> A = keycode of first pressed key or $ff
+scan_key
+        ldx #0
+-       lda colsel,x
+        sta $dc00
+        lda $dc01
+        cmp #$ff
+        bne +
+        inx
+        cpx #8
+        bne -
+        lda #$ff
+        sta $dc00
+        rts
++       ldy #0
+-       lsr
+        bcc +
+        iny
+        bne -
++       sty tmp0
+        txa
+        asl
+        asl
+        asl
+        ora tmp0
+        ldx #$ff
+        stx $dc00
+        rts
+
+; ---------------------------------------------------- hiscores
+init_hiscores
+        ldx #5*6-1
+-       lda hs_default,x
+        sta hiscores,x
+        dex
+        bpl -
+        rts
+hs_default
+        .text "MTR"
+        .byte $00,$50,$00
+        .text "CHR"
+        .byte $00,$40,$00
+        .text "IRM"
+        .byte $00,$30,$00
+        .text "CLD"
+        .byte $00,$20,$00
+        .text "C64"
+        .byte $00,$10,$00
