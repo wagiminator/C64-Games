@@ -26,6 +26,11 @@ Defend your garden against the undead! Collect sunlight, plant flowers that spit
 
 ![thorn_preview.png](C64_Thorn/documentation/thorn_preview.png)
 
+# [SUNRUSH](C64_Sunrush/)
+Chase the sun! A pseudo 3D racing game with ten stages arranged as a pyramid: at every checkpoint the road forks and you choose your route to one of four goals. Smooth curves and stripes from a raster line program that changes scroll position and colours on every line, scaled sprites for palms, rocks and traffic, a radio with three tunes and a race against the clock. A tribute to Out Run.
+
+![sunrush_preview.png](C64_Sunrush/documentation/sunrush_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
