@@ -106,7 +106,7 @@ The game is written in 6502 assembler for [64tass](https://sourceforge.net/proje
 | `src/irq.asm` | 286 | menu IRQ, sky split IRQ, road IRQ with the line program, sprite take-over, row copy code generator |
 | `src/hud.asm` | 248 | time, score, speed, course progress and messages |
 | `src/screens.asm` | 1039 | title screen, radio select, game over, endings, credits, hiscore entry |
-| `src/sound.asm` | 554 | SID music player (3 voices, instruments, arpeggios, vibrato), sound effects and engine sound |
+| `src/sound.asm` | 560 | SID music player (3 voices, instruments, arpeggios, vibrato), sound effects and engine sound |
 | `src/util.asm` | 227 | text output, BCD score handling, random numbers, keyboard scan, joystick |
 
 ## Python Tools

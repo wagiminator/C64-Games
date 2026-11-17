@@ -31,6 +31,11 @@ Chase the sun! A pseudo 3D racing game with ten stages arranged as a pyramid: at
 
 ![sunrush_preview.png](C64_Sunrush/documentation/sunrush_preview.png)
 
+# [SKYHOP](C64_Skyhop/)
+Bounce up to the moon! An endless jumping game: hop from platform to platform, higher and higher through five sky zones, with springs, propeller hats and jetpacks, moving, breaking and vanishing platforms, monsters to stomp or shoot and black holes to avoid. Smooth vertical scrolling over checkered paper with double-buffered screens, an ending on the moon at 50000 points. A tribute to Doodle Jump.
+
+![skyhop_preview.png](C64_Skyhop/documentation/skyhop_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
