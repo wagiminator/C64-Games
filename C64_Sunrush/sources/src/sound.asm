@@ -44,6 +44,7 @@ sfx_pl  .byte ?
 sfx_ph  .byte ?
 mu_tmp  .byte ?
 mu_tmp2 .byte ?
+snd_end
         .endv
 
 sid_init
@@ -54,9 +55,14 @@ sid_init
         bpl -
         lda #$0f
         sta $d418
+        ; clear all player/sfx/engine state: the cartridge boot skips the
+        ; KERNAL RAM clear, so page 3 holds power-on garbage (eng_on <> 0
+        ; would play the engine on voice 3 during the title screen)
+        ldx #snd_end-mu_on-1
         lda #0
-        sta mu_on
-        sta sfx_act
+-       sta mu_on,x
+        dex
+        bpl -
         rts
 
 ; A = tune number
