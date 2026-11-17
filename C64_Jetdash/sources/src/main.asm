@@ -53,6 +53,7 @@ KEY_P   = 41
 KEY_M   = 36
 KEY_STOP = 63
 DBGAI   = $03fd
+DBGRAST = $03fc                 ; raster time bars in the border (debugging)
 
 ; ---------------------------------------------------------- zero page
         .virtual $02
@@ -270,6 +271,7 @@ start
         lda #0
         sta DBGJOY
         sta DBGAI
+        sta DBGRAST             ; page 3 is not cleared when booting from the cartridge
         sta cheat
         sta startzone
         sta musicoff

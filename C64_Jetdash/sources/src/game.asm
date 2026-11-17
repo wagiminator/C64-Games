@@ -185,7 +185,7 @@ game_loop
         lda #0
         sta ntscc
         jmp game_loop
-+       lda $03fc
++       lda DBGRAST
         beq +
         sta $d020
 +       jsr read_input
@@ -218,12 +218,12 @@ game_loop
         sta nxs
         lda #1
         sta spend
-        lda $03fc
+        lda DBGRAST
         beq +
         lda #2
         sta $d020
 +       jsr prep_step
-        lda $03fc
+        lda DBGRAST
         beq +
         lda #0
         sta $d020
