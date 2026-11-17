@@ -46,6 +46,11 @@ A sweet match-three puzzle: swap neighbouring sweets to line up three or more, c
 
 ![gumdrop_preview.png](C64_Gumdrop/documentation/gumdrop_preview.png)
 
+# [NIGHTHOLD](C64_Nighthold/)
+Survive the night! A horde survival game: walk across a haunted heath while your weapons fight on their own against up to 80 bats, zombies, skeletons, ghosts, ghouls and wraiths. Collect gems, level up and choose from five weapons and four items, defeat three bosses and hold out ten minutes until dawn. Smooth eight-way scrolling with two completely rebuilt screens and creatures made of characters. A tribute to Vampire Survivors.
+
+![nighthold_preview.png](C64_Nighthold/documentation/nighthold_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
