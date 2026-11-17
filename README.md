@@ -36,6 +36,11 @@ Bounce up to the moon! An endless jumping game: hop from platform to platform, h
 
 ![skyhop_preview.png](C64_Skyhop/documentation/skyhop_preview.png)
 
+# [JETDASH](C64_Jetdash/)
+Fly through the lab! A side-scrolling jetpack game: hold fire to fly, dodge zappers, homing missiles and laser beams, collect coins and grab gadget boxes for a copter or a gravity belt. Five zones from the lab to the server hall and an escape into the open sky after 5000 metres. Smooth double-buffered horizontal scrolling with generated copy code and pixel-exact collisions. A tribute to Jetpack Joyride.
+
+![jetdash_preview.png](C64_Jetdash/documentation/jetdash_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
