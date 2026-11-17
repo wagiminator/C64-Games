@@ -41,6 +41,11 @@ Fly through the lab! A side-scrolling jetpack game: hold fire to fly, dodge zapp
 
 ![jetdash_preview.png](C64_Jetdash/documentation/jetdash_preview.png)
 
+# [GUMDROP](C64_Gumdrop/)
+A sweet match-three puzzle: swap neighbouring sweets to line up three or more, create striped blasters, bombs and rainbow drops and set off cascades. Twenty levels with score and ice goals, a limited number of moves and three lives. Multicolour bitmap board with smoothly falling sweets that alternate between two colour slots. A tribute to Candy Crush Saga.
+
+![gumdrop_preview.png](C64_Gumdrop/documentation/gumdrop_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
