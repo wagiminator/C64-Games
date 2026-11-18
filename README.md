@@ -51,6 +51,11 @@ Survive the night! A horde survival game: walk across a haunted heath while your
 
 ![nighthold_preview.png](C64_Nighthold/documentation/nighthold_preview.png)
 
+# [FLEETFOOT](C64_Fleetfoot/)
+Run for your life! An endless runner in pseudo 3D: change lanes, jump over hurdles, slide under bars and dodge blocks while a giant boulder rolls behind you. Coins, magnets, spring boots, a score star and an amulet on the way through five lands from the temple to the fire mountain. Track stripes rendered into the charset by generated code that races the raster beam, far objects drawn into characters, near objects as scaled and multiplexed sprites. A tribute to Subway Surfers and Temple Run.
+
+![fleetfoot_preview.png](C64_Fleetfoot/documentation/fleetfoot_preview.png)
+
 # Playing the Games
 Each game folder contains a `binaries` folder with five formats:
 
