@@ -26,8 +26,11 @@ PFROWS  = 21                    ; playfield rows (0..20), row 21 separator
 SPLIT   = 221                   ; raster line of HUD split (inside row 21)
 TOPLINE = 42
 
-NV      = 40                    ; virtual sprites
+NV      = 48                    ; per buffer: candidates (fixed IDs) / mux entries + 8
+NC      = 37                    ; candidates: ship, orb, 8 shots, 10 enemies, 8 bullets, 9 boss
+ID_BOSS = 28                    ; first boss candidate
 MUXGAP  = 3                     ; lines between rewriting a hardware sprite and its new top line
+MUXW    = 3                     ; raster lines the IRQ chain needs per sprite write
 N_PB    = 8                     ; player bullets
 N_EN    = 10                    ; enemies / explosions / items
 N_EB    = 8                     ; enemy bullets
@@ -100,6 +103,9 @@ ox0     .byte ?
 ox1     .byte ?
 oy0     .byte ?
 oy1     .byte ?
+cbase   .byte ?                 ; buffer being built (0 / NV)
+si      .byte ?                 ; position in the sort order
+mtw     .byte ?                 ; first line the IRQ chain can do the next write
         .endv
 
         .virtual $0200
@@ -173,20 +179,13 @@ skipflag .byte ?
 
         .virtual $c000
 ; --- virtual sprites
-cy      .fill NV
-cxl     .fill NV
-cxh     .fill NV
-cp      .fill NV
-cc      .fill NV
-bnext   .fill NV
-bhead   .fill 16
-nactive .byte ?
-; --- mux output (double buffered: 0..39 / 40..79)
-outy    .fill 80
-outxl   .fill 80
-outxh   .fill 80
-outp    .fill 80
-outc    .fill 80
+cy      .fill NV*2              ; candidates by fixed ID, double buffered (0.. / NV..)
+cxl     .fill NV*2
+cxh     .fill NV*2
+cp      .fill NV*2
+cc      .fill NV*2
+sord    .fill NC+1              ; IDs in Y order (kept from frame to frame) + end mark
+; --- mux output (double buffered: 0.. / NV..): see outcand/outslot/outfree
 ; --- player bullets
 pb_t    .fill N_PB
 pb_xl   .fill N_PB
@@ -266,16 +265,16 @@ hiscores .fill 5*6              ; 3 name chars + 3 BCD bytes (lo,mid,hi)
 hientry .byte ?
 txtbuf  .fill 16
 ; --- multiplexer: hardware sprite allocation
-sl_ring .fill 8                 ; hardware sprites in the order of their last use
-sl_head .byte ?                 ; ring position of the one free first
-sl_free .fill 8                 ; per hardware sprite: line where it gets free
-sl_last .fill 8                 ; ... output entry of its last sprite
-outslot .fill 80                ; hardware sprite of an output entry
-outfree .fill 80                ; raster line for the write (0 = in the split IRQ)
-outpri  .fill 80                ; 1 = must not be dropped
-bstart  .byte ?                 ; first candidate of the boss
-shipin  .byte ?                 ; 1 = candidate 0 is the ship
+; entry i shows candidate outcand,i on hardware sprite outslot,i, written at raster
+; line outfree,i (0 = in the split IRQ). Entries i+0..i+7 double as the queue of the
+; hardware sprites in the order they get free (slot, free line, last entry).
+outslot .fill NV*2
+outfree .fill NV*2
+outcand .fill NV*2
+outlast .fill NV*2
         .endv
+        .cerror (>cy) != (>(cy+NV*2-1)), "cy crosses a page (patched lookups)"
+        .cerror NC+8 > NV, "mux buffers too small"
 
 ; ---------------------------------------------------------- BASIC stub
         * = $0801

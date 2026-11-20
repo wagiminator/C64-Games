@@ -548,27 +548,22 @@ _pn     dey
         jmp kill_player
 _r      rts
 
-boss_sprites
+boss_sprites                    ; X = cbase + ID_BOSS: the 9 parts (Y $ff = not shown)
         lda b_on
-        bne +
-        rts
-+       lda b_dead
+        beq _off
+        lda b_dead
         beq +
         lda frame
         and #2
-        beq +
-        rts
+        bne _off
 +       ldy level
         lda boss_base,y
         sta tmp0
-        lda boss_alt,y
-        sta tmp3
         lda boss_col,y
-        ldx b_fl
+        ldy b_fl
         beq +
         lda #1
 +       sta tmp1
-        ldx nactive
         ldy #0
 _lp     lda b_xl
         clc
@@ -586,31 +581,34 @@ _lp     lda b_xl
         adc boss_ry,y
         sta cy,x
         tya
-        clc
-        adc tmp0
-        sta tmp2
-        lda b_alt
-        beq _np
-        cpy #3
-        bne +
-        lda tmp3
-        sta tmp2
-        bne _np
-+       cpy #4
-        bne _np
-        lda tmp3
-        clc
-        adc #1
-        sta tmp2
-_np     lda tmp2
+        adc tmp0                ; (C = 0)
         sta cp,x
         lda tmp1
         sta cc,x
         inx
-_skip   iny
+        iny
         cpy #9
         bne _lp
-        stx nactive
+        beq _alt
+_skip   lda #$ff
+        sta cy,x
+        inx
+        iny
+        cpy #9
+        bne _lp
+_alt    lda b_alt               ; alternative frames for parts 3 and 4
+        beq +
+        ldy level
+        lda boss_alt,y
+        sta cp-6,x
+        clc
+        adc #1
+        sta cp-5,x
++       rts
+_off    lda #$ff
+        .for i := 0, i < 9, i += 1
+        sta cy+i,x
+        .next
         rts
 boss_rx .byte 0,24,48,0,24,48,0,24,48
 boss_ry .byte 0,0,0,21,21,21,42,42,42
