@@ -27,6 +27,7 @@ SPLIT   = 221                   ; raster line of HUD split (inside row 21)
 TOPLINE = 42
 
 NV      = 40                    ; virtual sprites
+MUXGAP  = 3                     ; lines between rewriting a hardware sprite and its new top line
 N_PB    = 8                     ; player bullets
 N_EN    = 10                    ; enemies / explosions / items
 N_EB    = 8                     ; enemy bullets
@@ -264,6 +265,16 @@ b_shots .byte ?
 hiscores .fill 5*6              ; 3 name chars + 3 BCD bytes (lo,mid,hi)
 hientry .byte ?
 txtbuf  .fill 16
+; --- multiplexer: hardware sprite allocation
+sl_ring .fill 8                 ; hardware sprites in the order of their last use
+sl_head .byte ?                 ; ring position of the one free first
+sl_free .fill 8                 ; per hardware sprite: line where it gets free
+sl_last .fill 8                 ; ... output entry of its last sprite
+outslot .fill 80                ; hardware sprite of an output entry
+outfree .fill 80                ; raster line for the write (0 = in the split IRQ)
+outpri  .fill 80                ; 1 = must not be dropped
+bstart  .byte ?                 ; first candidate of the boss
+shipin  .byte ?                 ; 1 = candidate 0 is the ship
         .endv
 
 ; ---------------------------------------------------------- BASIC stub

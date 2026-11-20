@@ -81,9 +81,9 @@ The empty space behind the landscape is filled with background characters. Their
 In game mode, an IRQ chain runs every frame:
 - **Top IRQ (line 42):** sets the fine scroll and the screen of the frame and enables the sprites.
 - **Multiplexer IRQs:** whenever a hardware sprite is free again, it is reused for the next virtual sprite further down the screen.
-- **Split IRQ (line 221):** switches to a fixed text mode for the HUD, takes over the next frame's data prepared by the main loop (double buffered with a `ready` flag), writes the first eight sprites of the next frame, shifts the colour RAM at a coarse step, rotates the parallax layers and plays music and sound.
+- **Split IRQ (line 221):** switches to a fixed text mode for the HUD, takes over the next frame's data prepared by the main loop (double buffered with a `ready` flag), writes the sprites whose hardware sprite is free from the top of the next frame, shifts the colour RAM at a coarse step, rotates the parallax layers and plays music and sound.
 
-The main loop collects up to 40 virtual sprites per frame (ship, orb, eight player bullets, ten enemies, eight enemy bullets, boss parts), sorts them with a bucket sort by their Y coordinate and builds the list for the multiplexer.
+The main loop collects up to 40 virtual sprites per frame (ship, orb, eight player bullets, ten enemies, eight enemy bullets, boss parts), sorts them with a bucket sort by their Y coordinate and assigns the hardware sprites. These wait in a ring in the order of their last use, so the next virtual sprite always gets the one that is free first, and the raster lines of the rewrites grow along the list. A hardware sprite is reused only if it is free at least three lines before the new sprite starts, which leaves the interrupt time to write it. When all eight are busy, a boss part or the ship takes over the hardware sprite of a bullet or an enemy, so the big three-by-three bosses are always complete.
 
 ## Sound
 The music player in `sound.asm` plays the music data created by the music compiler (`tools/music.py`) from note patterns written in Python. It supports instruments with ADSR, pulse width modulation, arpeggios, vibrato and drums. The sound effects use voice 3 and temporarily take it over from the music.
@@ -103,11 +103,11 @@ The game is written in 6502 assembler for [64tass](https://sourceforge.net/proje
 
 | File | Lines | Content |
 |:-|-:|:-|
-| `src/main.asm` | 358 | memory map, constants, variables, segment layout, includes |
+| `src/main.asm` | 369 | memory map, constants, variables, segment layout, includes |
 | `src/game.asm` | 292 | game flow: new game, stage start, main loop, stage logic, pause, cheat keys |
-| `src/irq.asm` | 463 | menu IRQ and game IRQ chain (top, multiplexer, HUD split), parallax rotation, colour shift code generator |
+| `src/irq.asm` | 460 | menu IRQ and game IRQ chain (top, multiplexer, HUD split), parallax rotation, colour shift code generator |
 | `src/scroll.asm` | 508 | scrolling engine: level init, column generation, double-buffered screen shift, terrain lookup, level events |
-| `src/sprites.asm` | 274 | virtual sprite list, bucket sort, multiplexer preparation |
+| `src/sprites.asm` | 404 | virtual sprite list, bucket sort, hardware sprite allocation for the multiplexer |
 | `src/player.asm` | 768 | player ship, terrain collision, weapons, charge beam, orb satellite |
 | `src/enemies.asm` | 1282 | enemy types, spawners, enemy bullets, power-up capsules, collisions |
 | `src/boss.asm` | 616 | the six end bosses, their movement and attack patterns |
