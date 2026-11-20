@@ -138,22 +138,23 @@ irq_split
         sta ready
         sta nx_cshift
 _nolatch
-        ; ---- first 8 sprites
+        ; ---- sprites whose hardware sprite is free from the top of the frame
         ldx mux_base
-        ldy #0
+        lda #0
+        sta cur_d015
 _f8     cpx mux_end
         beq _f8d
-        cpy #8
-        beq _f8d
-        sty itmp0
+        lda outfree,x
+        bne _f8n
         jsr mux_write
-        ldy itmp0
-        iny
-        inx
-        bne _f8
-_f8d    stx mux_idx
-        lda d015tab,y
+        ldy outslot,x
+        lda cur_d015
+        ora bittab,y
         sta cur_d015
+_f8n    inx
+        bne _f8
+_f8d    ldx mux_base
+        stx mux_idx
         ; ---- parallax char rotation
         jsr bg_rotate
         ; ---- next irq: top of screen
@@ -214,12 +215,15 @@ mux_loop
         inx
         stx mux_idx
 mux_sched
-        cpx mux_end
+        ; entries already written in the split IRQ are skipped
+_skp    cpx mux_end
         bcs _tosplit
-        lda outy-8,x
-        clc
-        adc #22
-        cmp #SPLIT-3
+        lda outfree,x
+        bne +
+        inx
+        stx mux_idx
+        bne _skp
++       cmp #SPLIT-3
         bcs _tosplit
         sta irqtmp
         lda $d012
@@ -263,12 +267,14 @@ _tosplit
 
 ; X = index into out tables
 mux_write
-        ldy slot2tab,x
+        lda outslot,x
+        asl
+        tay
         lda outy,x
         sta $d001,y
         lda outxl,x
         sta $d000,y
-        ldy slot1tab,x
+        ldy outslot,x
         lda outp,x
         sta SCRA+$3f8,y
         sta SCRB+$3f8,y
@@ -285,17 +291,8 @@ mux_write
         sta $d010
         rts
 
-d015tab .byte 0,1,3,7,15,31,63,127,255
 bittab  .byte 1,2,4,8,16,32,64,128
 nbittab .byte $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
-slot1tab
-        .for i := 0, i < 80, i += 1
-        .byte i & 7
-        .next
-slot2tab
-        .for i := 0, i < 80, i += 1
-        .byte (i & 7) * 2
-        .next
 
 ; ---------------------------------------------------- parallax rotation (3 layers)
 ; layer 0: far stars (8 chars), 1: mid stars (4 chars), 2: skyline (8 chars)
