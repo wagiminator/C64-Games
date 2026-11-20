@@ -211,7 +211,29 @@ irq_mux
         #IPROF_IN
 mux_loop
         ldx mux_idx
-        jsr mux_write
+        ldy outcand,x           ; Y = candidate
+        lda outslot,x
+        tax                     ; X = hardware sprite
+        lda cp,y
+        sta SCRA+$3f8,x
+        sta SCRB+$3f8,x
+        lda cc,y
+        sta $d027,x
+        lda cxh,y
+        beq +
+        lda $d010
+        ora bittab,x
+        bne ++
++       lda $d010
+        and nbittab,x
++       sta $d010
+        lda dbltab,x
+        tax
+        lda cxl,y
+        sta $d000,x
+        lda cy,y
+        sta $d001,x
+        ldx mux_idx
         inx
         stx mux_idx
 mux_sched
@@ -267,32 +289,39 @@ _tosplit
 
 ; X = index into out tables
 mux_write
+        stx itmp1
+        ldy outcand,x           ; Y = candidate
         lda outslot,x
         asl
-        tay
-        lda outy,x
-        sta $d001,y
-        lda outxl,x
-        sta $d000,y
-        ldy outslot,x
-        lda outp,x
-        sta SCRA+$3f8,y
-        sta SCRB+$3f8,y
-        lda outc,x
-        sta $d027,y
-        lda outxh,x
+        tax                     ; X = hardware sprite * 2
+        lda cy,y
+        sta $d001,x
+        lda cxl,y
+        sta $d000,x
+        txa
+        lsr
+        tax                     ; X = hardware sprite
+        lda cp,y
+        sta SCRA+$3f8,x
+        sta SCRB+$3f8,x
+        lda cc,y
+        sta $d027,x
+        lda cxh,y
         beq +
         lda $d010
-        ora bittab,y
+        ora bittab,x
         sta $d010
+        ldx itmp1
         rts
 +       lda $d010
-        and nbittab,y
+        and nbittab,x
         sta $d010
+        ldx itmp1
         rts
 
 bittab  .byte 1,2,4,8,16,32,64,128
 nbittab .byte $fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+dbltab  .byte 0,2,4,6,8,10,12,14
 
 ; ---------------------------------------------------- parallax rotation (3 layers)
 ; layer 0: far stars (8 chars), 1: mid stars (4 chars), 2: skyline (8 chars)

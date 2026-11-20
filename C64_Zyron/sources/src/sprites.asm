@@ -1,6 +1,11 @@
 ; =====================================================================
-;  Virtual sprite list, sorting and multiplexer preparation
+;  Virtual sprites (candidates), sorting and multiplexer preparation
 ; =====================================================================
+;  Every object has a fixed candidate ID (0 ship, 1 orb, 2..9 shots,
+;  10..19 enemies, 20..27 enemy bullets, 28..36 boss), so the Y order of
+;  the last frame is kept in sord and an insertion sort only has to fix
+;  what moved. The candidates are double buffered (cbase = 0 / NV): the
+;  IRQ shows one buffer while the main loop builds the other one.
 
 init_vsprites
         lda #0
@@ -8,21 +13,51 @@ init_vsprites
         sta mux_end
         sta mux_idx
         sta nx_count
+        ; sort order: IDs in a row + end mark (ID NC is never shown)
+        ldx #NC
+-       txa
+        sta sord,x
+        dex
+        bpl -
+        lda #$ff
+        sta cy+NC
+        sta cy+NV+NC
+        ; queue entries 0..7 of both buffers: hardware sprites 0..7, free at once
+        ldx #7
+-       txa
+        sta outslot,x
+        sta outslot+NV,x
+        lda #0
+        sta outfree,x
+        sta outfree+NV,x
+        dex
+        bpl -
         rts
 
-; append sprite: A = y, uses sp_xl/sp_xh/sp_p/sp_c staged in ZP vars
 build_sprites
+        lda mux_base            ; build into the buffer the IRQ does not show
+        beq +
         lda #0
-        sta shipin
-        ldx #0
-        ; ---- player
+        beq ++
++       lda #NV
++       sta cbase
+        sta nx_base
+        tax
+        clc                     ; point the Y lookups of sort and allocation
+        adc #<cy                ; at this buffer
+        sta s_cy0+1
+        sta s_cy1+1
+        sta s_cy2+1
+        sta a_cy+1
+        sta f_cy+1
+        ; ---- ID 0: player
         lda pstate
         bne _pdie
         lda pinv
         beq +
         lda frame
         and #4
-        bne _porb
+        bne _pnone
 +       lda py
         sta cy,x
         lda px_l
@@ -40,17 +75,16 @@ build_sprites
         sta cp,x
         lda #14
         sta cc,x
-        inc shipin              ; the ship (index 0) is never dropped
         inx
         jmp _porb
 _pdie   cmp #1
-        bne _porb
+        bne _pnone
         lda ptimer
         lsr
         lsr
         lsr
         cmp #6
-        bcs _porb
+        bcs _pnone
         adc #SPR_EXPLODE
         sta cp,x
         lda py
@@ -62,11 +96,15 @@ _pdie   cmp #1
         lda #7
         sta cc,x
         inx
-_porb   ; ---- orb
+        jmp _porb
+_pnone  lda #$ff
+        sta cy,x
+        inx
+_porb   ; ---- ID 1: orb
         lda orbon
-        beq _pb
+        beq _onone
         lda pstate
-        bne _pb
+        bne _onone
         lda oy
         sta cy,x
         lda ox_l
@@ -82,7 +120,11 @@ _porb   ; ---- orb
         lda #10
         sta cc,x
         inx
-_pb     ; ---- player bullets
+        jmp _pb
+_onone  lda #$ff
+        sta cy,x
+        inx
+_pb     ; ---- IDs 2..9: player bullets
         ldy #N_PB-1
 _pl     lda pb_t,y
         beq _pn
@@ -102,9 +144,15 @@ _pl     lda pb_t,y
         lda pb_col,y
         sta cc,x
         inx
-_pn     dey
+        dey
         bpl _pl
-        ; ---- enemies
+        bmi _ens
+_pn     lda #$ff
+        sta cy,x
+        inx
+        dey
+        bpl _pl
+_ens    ; ---- IDs 10..19: enemies
         ldy #N_EN-1
 _el     lda en_t,y
         beq _en
@@ -131,9 +179,15 @@ _el     lda en_t,y
 _nf     lda en_col,y
 _cf     sta cc,x
         inx
-_en     dey
+        dey
         bpl _el
-        ; ---- enemy bullets
+        bmi _ebs
+_en     lda #$ff
+        sta cy,x
+        inx
+        dey
+        bpl _el
+_ebs    ; ---- IDs 20..27: enemy bullets
         lda frame
         lsr
         lsr
@@ -142,8 +196,8 @@ _en     dey
         adc #SPR_EBULLET
         sta tmp0
         ldy #N_EB-1
--       lda eb_on,y
-        beq +
+_bl     lda eb_on,y
+        beq _bn
         lda eb_xl,y
         sta cxl,x
         lda eb_xh,y
@@ -155,250 +209,162 @@ _en     dey
         lda #10
         sta cc,x
         inx
-+       dey
-        bpl -
-        ; ---- boss
-        stx nactive
-        stx bstart              ; boss parts are never dropped
+        dey
+        bpl _bl
+        bmi _bos
+_bn     lda #$ff
+        sta cy,x
+        inx
+        dey
+        bpl _bl
+_bos    ; ---- IDs 28..36: boss (X = cbase + ID_BOSS)
         jsr boss_sprites
-        jmp sort_sprites
 
-; bucket lists (16 buckets of 16 lines), each kept sorted on insert; then accept
+; ---- insertion sort of the IDs by Y: the order of the last frame is almost right
 sort_sprites
-        ldx #15
-        lda #$ff
--       sta bhead,x
-        dex
-        bpl -
-        ldx nactive
-        dex
-        bpl _si
-        jmp _empty
-_si     lda cy,x
+        ldy sord
+s_cy0 = *
+        lda cy,y                ; (operand patched to this buffer)
+        sta tmp2                ; largest Y so far
+        ldx #1
+_sl     ldy sord,x
+s_cy1 = *
+        lda cy,y
+        cmp tmp2
+        bcc _ins
         sta tmp2
-        lsr
-        lsr
-        lsr
-        lsr
-        sta tmp3
-        tay
-        lda bhead,y
-        bmi _front
-        tay
-        lda cy,y
-        cmp tmp2
-        bcs _front
-_walk   sty tmp4
-        lda bnext,y
-        bmi _after
-        tay
-        lda cy,y
-        cmp tmp2
-        bcc _walk
-_after  ldy tmp4
-        lda bnext,y
-        sta bnext,x
-        txa
-        sta bnext,y
+        inx
+        cpx #NC
+        bne _sl
+        beq alloc_sprites
+_ins    sta tmp3                ; move it down past all larger ones
+        sty tmp4
+        stx tmp5
+-       lda sord-1,x
+        sta sord,x
         dex
-        bpl _si
-        bmi _sorted
-_front  ldy tmp3
-        lda bhead,y
-        sta bnext,x
-        txa
-        sta bhead,y
-        dex
-        bpl _si
-_sorted
-        jmp alloc_sprites
-_empty  lda mux_base
         beq +
-        lda #0
-        beq ++
-+       lda #40
-+       sta nx_base
-        lda #0
-        sta nx_count
-        rts
-
-; ---- allocate the hardware sprites in Y order. They wait in a ring in the order
-;      of their last use, so the head is always the one that gets free first and
-;      the write lines of the list grow with the list. Boss parts and the ship
-;      take over the hardware sprite of another sprite when none is free.
-alloc_sprites
-        ldx #7
--       txa
-        sta sl_ring,x
-        lda #0
-        sta sl_free,x
-        dex
-        bpl -
-        lda #0
-        sta sl_head
-        lda mux_base            ; output into the buffer that is not shown
-        beq +
-        lda #0
-        beq ++
-+       lda #40
-+       sta nx_base
-        sta tmp7
-        tax                     ; X = output index
-        lda #0
-        sta tmp6                ; bucket
-_tb     ldy tmp6
-        lda bhead,y
-_ti     bpl +
-        jmp _nb
-+       sta tmp4                ; candidate
-        tay
+        ldy sord-1,x
+s_cy2 = *
         lda cy,y
-        cmp #SPLIT-4
-        bcc +
-        jmp _done
-+       sec
-        sbc #MUXGAP
-        bcs +
-        lda #0
-+       sta tmp3                ; latest free line that is early enough
-        ldy sl_head
-        lda sl_ring,y
-        tay                     ; Y = hardware sprite at the head
-        lda sl_free,y
         cmp tmp3
         beq +
-        bcs _full
-+       sta outfree,x
-        lda sl_head
-        clc
-        adc #1
-        and #7
-        sta sl_head
-_put    ; Y = hardware sprite, X = output entry
-        tya
-        sta outslot,x
-        txa
-        sta sl_last,y
-        sty tmp5
-        ldy tmp4
-        lda cy,y
-        sta outy,x
-        clc
-        adc #22                 ; free after its 21 lines
-        ldy tmp5
-        sta sl_free,y
-        ldy tmp4
-        jsr prio
-        sta outpri,x
-        lda cxl,y
-        sta outxl,x
-        lda cxh,y
-        sta outxh,x
-        lda cp,y
-        sta outp,x
-        lda cc,y
-        sta outc,x
+        bcs -
++       lda tmp4
+        sta sord,x
+        ldx tmp5
         inx
-_next   ldy tmp4
-        lda bnext,y
-        jmp _ti
-_nb     inc tmp6
-        lda tmp6
-        cmp #16
-        beq _done
-        jmp _tb
+        cpx #NC
+        bne _sl
+
+; ---- allocate the hardware sprites in Y order. They wait in a queue in the order
+;      they get free; entry i takes the head (queue position i) and puts its
+;      hardware sprite back at position i+8, so the write lines grow along the
+;      list. Boss parts and the ship take over the hardware sprite of a sprite
+;      without priority when none is free in time.
+alloc_sprites
+        ldx cbase               ; X = output entry = queue head
+        lda #0
+        sta si
+        sta mtw
+_al     ldy si
+        lda sord,y
+        sta tmp4
+        tay                     ; Y = ID
+a_cy = *
+        lda cy,y
+        cmp #SPLIT-4
+        bcs _done               ; (the rest is lower or not shown)
+        sbc #MUXGAP-1           ; (C = 0) latest write line that is early enough
+        ldy outfree,x
+        beq _take               ; hardware sprite free from the top: split IRQ
+        sta tmp3
+        cmp mtw
+        bcc _full               ; the IRQ chain is still busy with earlier writes
+        cpy tmp3
+        beq +
+        bcs _full               ; the hardware sprite is not free in time
++       tya                     ; the chain writes at max(free line, mtw)
+        cmp mtw
+        bcs +
+        lda mtw
++       clc
+        adc #MUXW
+        sta mtw
+        lda tmp3
+        sec
+_take   adc #21+MUXGAP          ; (C = 1) free after its 21 lines
+        sta outfree+8,x
+        lda tmp4
+        clc
+        adc cbase
+        sta outcand,x
+        lda outslot,x
+        sta outslot+8,x
+        txa
+        sta outlast+8,x
+        inx
+_nx     inc si
+        bne _al
 _done   txa
         sec
-        sbc tmp7
+        sbc cbase
         sta nx_count
         rts
-        ; ---- no hardware sprite free: priority sprites replace the last
-        ;      sprite of a hardware sprite that has no priority
-_full   ldy tmp4
-        jsr prio
-        beq _next               ; dropped
-        stx tmp2
+        ; ---- no hardware sprite free in time
+_full   lda tmp4
+        beq +                   ; the ship
+        cmp #ID_BOSS
+        bcc _nx                 ; other sprites are dropped
++       ldy tmp4
+        stx tmp2                ; queue head
+f_cy = *
+        lda cy,y
+        sta tmp3                ; Y of the new sprite
         lda #8
         sta tmp5
-        ldx sl_head             ; search from the oldest
-_fs     lda sl_ring,x
-        tay
-        stx tmp1                ; ring position
-        ldx sl_last,y
-        lda outpri,x
-        bne _fsn
-        ; the replaced entry keeps its write line and hardware sprite
-        txa
-        ldx tmp2
-        tax
-        jsr _move               ; ring position tmp1 -> back
-        ldy outslot,x
-        jsr _put2
-        ldx tmp2
-        jmp _next
-_fsn    ldx tmp1
-        inx
-        txa
-        and #7
-        tax
+_fs     ldy outlast,x           ; last entry of the hardware sprite at queue pos X
+        lda outcand,y
+        sec
+        sbc cbase
+        beq _fsn                ; the ship
+        cmp #ID_BOSS
+        bcc _evict
+_fsn    inx
         dec tmp5
         bne _fs
-        ldx tmp2
-        jmp _next
-; overwrite entry X with candidate tmp4 (hardware sprite Y)
-_put2   tya
-        sta tmp5
-        ldy tmp4
-        lda cy,y
-        sta outy,x
+        ldx tmp2                ; all have priority: dropped
+        jmp _nx
+_evict  ; entry Y shows the new sprite instead (same write line, same sprite)
+        lda tmp4
+        clc
+        adc cbase
+        sta outcand,y
+        sty tmp6
+        lda outslot,x
+        sta tmp0
+        ; this hardware sprite now gets free last: to the end of the queue
+        lda tmp2
+        clc
+        adc #7
+        sta tmp1
+-       cpx tmp1
+        beq +
+        lda outslot+1,x
+        sta outslot,x
+        lda outfree+1,x
+        sta outfree,x
+        lda outlast+1,x
+        sta outlast,x
+        inx
+        bne -
++       lda tmp0
+        sta outslot,x
+        lda tmp3
         clc
         adc #22
-        ldy tmp5
-        sta sl_free,y
-        ldy tmp4
-        jsr prio
-        sta outpri,x
-        lda cxl,y
-        sta outxl,x
-        lda cxh,y
-        sta outxh,x
-        lda cp,y
-        sta outp,x
-        lda cc,y
-        sta outc,x
-        rts
-; move the hardware sprite at ring position tmp1 to the back (just before the head)
-_move   txa
-        pha
-        ldx tmp1
-        lda sl_ring,x
-        sta tmp5
--       txa
-        clc
-        adc #1
-        and #7
-        cmp sl_head
-        beq +
-        tay
-        lda sl_ring,y
-        sta sl_ring,x
-        tya
-        tax
-        jmp -
-+       lda tmp5
-        sta sl_ring,x
-        pla
-        tax
-        rts
-
-; A = 1 (Z clear) when candidate Y must not be dropped: boss parts and the ship
-prio    cpy bstart
-        bcs _p1
-        cpy #0
-        bne _p0
-        lda shipin
-        rts
-_p1     lda #1
-        rts
-_p0     lda #0
-        rts
+        sta outfree,x
+        lda tmp6
+        sta outlast,x
+        ldx tmp2
+        jmp _nx
