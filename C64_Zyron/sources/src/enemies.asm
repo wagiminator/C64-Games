@@ -20,9 +20,11 @@ clear_objects
 -       sta en_t,x
         dex
         bpl -
+        sta nfix
         ldx #N_PB-1
 -       sta pb_t,x
         sta pb_x1,x
+        sta pb_dhi,x
         dex
         bpl -
         ldx #N_EB-1

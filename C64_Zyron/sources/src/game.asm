@@ -117,12 +117,14 @@ game_loop
         jsr read_input
         lda paused
         bne _paused
+        jsr shots_erase
         jsr scroll_update
         #PROF 1
         jsr update_spawners
         jsr update_player
         #PROF 2
         jsr update_pbullets
+        jsr shots_draw
         #PROF 3
         jsr update_enemies
         #PROF 4

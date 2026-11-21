@@ -87,6 +87,7 @@ CH_BARL = 117
 CH_BARR = 118
 CH_SHIP = 119
 CH_LINE = 120
+CH_SHOT = 121     # player shots as chars: pulse, laser, spread
 CH_TERR = 128     # terrain chars 128..159
 
 NPAT = 3
@@ -196,6 +197,10 @@ def build_base_charset():
     cs[CH_BARR * 8: CH_BARR * 8 + 8] = bytes([0xE0, 0x10, 0x08, 0x08, 0x08, 0x08, 0x10, 0xE0])
     cs[CH_SHIP * 8: CH_SHIP * 8 + 8] = bytes([0x00, 0x30, 0x7C, 0xFF, 0x7E, 0x30, 0x00, 0x00])
     cs[CH_LINE * 8: CH_LINE * 8 + 8] = bytes([0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00])
+    # player shots (hires, colour from colour RAM)
+    cs[(CH_SHOT + 0) * 8:(CH_SHOT + 0) * 8 + 8] = bytes([0x00, 0x00, 0x0E, 0x7F, 0x7F, 0x0E, 0x00, 0x00])
+    cs[(CH_SHOT + 1) * 8:(CH_SHOT + 1) * 8 + 8] = bytes([0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00])
+    cs[(CH_SHOT + 2) * 8:(CH_SHOT + 2) * 8 + 8] = bytes([0x00, 0x3C, 0x7E, 0x7E, 0x7E, 0x7E, 0x3C, 0x00])
     return cs
 
 # ---------------------------------------------------------------- terrain textures
@@ -464,15 +469,32 @@ def make_sprites():
         s.set(0, 9, 3 if flame else 1)
         return s
     S['ship'] = [ship(SHIP, 0), ship(SHIP_UP, 0), ship(SHIP_DN, 0), ship(SHIP, 1)]
-    # orb (4 frames)
+    # orb (4 frames): pod with a cage open to the front, two pincers and a pulsing core
     orbs = []
+    cx, cy, rx, ry = 5.5, 10.5, 4.7, 9.4
+    def polar(x, y):
+        dx = (x + .5 - cx) / rx; dy = (y + .5 - cy) / ry
+        return math.hypot(dx, dy), math.degrees(math.atan2(dy, dx))
     for f in range(4):
-        s = Spr(); s.ellipse(6, 10, 4.2, 7.5, 0, shade=True)
-        a = f * math.pi / 2
-        for k in range(4):
-            ang = a + k * math.pi / 2
-            s.set(6 + math.cos(ang) * 5.2, 10 + math.sin(ang) * 9.5, 3)
-        s.set(5, 7, 3)
+        s = Spr()
+        for y in range(21):
+            for x in range(12):
+                d, a = polar(x, y)
+                if 0.68 <= d <= 1.0 and abs(a) > 40:
+                    s.p[y][x] = 3 if (d > 0.84 and -150 < a < -95) else 1
+        for sgn in (-1, 1):
+            x0 = cx + rx * 0.84 * math.cos(math.radians(40))
+            y0 = cy + sgn * ry * 0.84 * math.sin(math.radians(40))
+            for t in range(11):
+                u = t / 10
+                s.set(x0 - .5 + 2.6 * u, y0 - .5 - sgn * 1.6 * u, 1)
+            s.set(x0 + 2.1, y0 - .5 - sgn * 1.6, 3)
+        r = [0.46, 0.52, 0.58, 0.52][f]
+        w = [0.16, 0.22, 0.28, 0.22][f]
+        for y in range(21):
+            for x in range(12):
+                d, a = polar(x, y)
+                if d <= r: s.p[y][x] = 3 if d <= w else 2
         orbs.append(s)
     S['orb'] = orbs
     # player shots

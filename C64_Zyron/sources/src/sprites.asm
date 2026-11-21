@@ -117,7 +117,7 @@ _porb   ; ---- ID 1: orb
         and #3
         adc #SPR_ORB
         sta cp,x
-        lda #10
+        lda #8
         sta cc,x
         inx
         jmp _pb
@@ -127,7 +127,8 @@ _onone  lda #$ff
 _pb     ; ---- IDs 2..9: player bullets
         ldy #N_PB-1
 _pl     lda pb_t,y
-        beq _pn
+        cmp #B_MISSILE          ; (pulse, laser and spread are chars)
+        bcc _pn
         lda pb_xh,y
         beq +
         lda pb_xl,y
@@ -260,7 +261,7 @@ s_cy2 = *
 ; ---- allocate the hardware sprites in Y order. They wait in a queue in the order
 ;      they get free; entry i takes the head (queue position i) and puts its
 ;      hardware sprite back at position i+8, so the write lines grow along the
-;      list. Boss parts and the ship take over the hardware sprite of a sprite
+;      list. Boss parts, the ship and the orb take over the hardware sprite of a sprite
 ;      without priority when none is free in time.
 alloc_sprites
         ldx cbase               ; X = output entry = queue head
@@ -313,7 +314,8 @@ _done   txa
         rts
         ; ---- no hardware sprite free in time
 _full   lda tmp4
-        beq +                   ; the ship
+        cmp #2
+        bcc +                   ; the ship and the orb
         cmp #ID_BOSS
         bcc _nx                 ; other sprites are dropped
 +       ldy tmp4
@@ -327,7 +329,8 @@ _fs     ldy outlast,x           ; last entry of the hardware sprite at queue pos
         lda outcand,y
         sec
         sbc cbase
-        beq _fsn                ; the ship
+        cmp #2
+        bcc _fsn                ; the ship and the orb
         cmp #ID_BOSS
         bcc _evict
 _fsn    inx
