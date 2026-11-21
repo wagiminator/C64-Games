@@ -164,7 +164,7 @@ open(os.path.join(OUT, 'gen_data.asm'), 'w').write("\n".join(L) + "\n")
 C = ["; generated constants"]
 for k, v in syms.items():
     C.append("SPR_%s = $%02x" % (k.upper(), v))
-for k in ['CH_QUAD', 'CH_BG', 'CH_BAR', 'CH_BARL', 'CH_BARR', 'CH_SHIP', 'CH_LINE', 'CH_TERR', 'LAY_F', 'LAY_M', 'LAY_H', 'CH_FILL']:
+for k in ['CH_QUAD', 'CH_BG', 'CH_BAR', 'CH_BARL', 'CH_BARR', 'CH_SHIP', 'CH_LINE', 'CH_SHOT', 'CH_TERR', 'LAY_F', 'LAY_M', 'LAY_H', 'CH_FILL']:
     C.append("%s = %d" % (k, getattr(gfx, k)))
 C.append("LOGOROW = %d" % LOGOROW)
 C.append("LOGOROWS = %d" % LOGOROWS)

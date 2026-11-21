@@ -204,6 +204,18 @@ pb_x0   .fill N_PB
 pb_x1   .fill N_PB
 pb_y0   .fill N_PB
 pb_y1   .fill N_PB
+; player shots drawn as chars (pulse, laser, spread)
+pb_gc   .fill N_PB              ; column in the playfield grid
+pb_gr   .fill N_PB              ; row
+pb_alo  .fill N_PB              ; its screen address this frame
+pb_ahi  .fill N_PB
+pb_dlo  .fill N_PB              ; screen address it is drawn at (hi 0 = not drawn)
+pb_dhi  .fill N_PB
+pb_bg   .fill N_PB              ; char under it
+fix_lo  .fill N_PB              ; colour RAM cells to repair after a colour shift
+fix_hi  .fill N_PB
+fix_c   .fill N_PB
+nfix    .byte ?
 ; --- enemies
 en_t    .fill N_EN              ; type (0 free)
 en_xf   .fill N_EN

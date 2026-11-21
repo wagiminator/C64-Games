@@ -6,7 +6,7 @@ ZYRON is a horizontally scrolling shoot'em-up for the Commodore C64, written fro
 - Charge beam: hold fire to load the wave beam
 - Smooth full-screen scrolling with double-buffered screens at 50 frames per second
 - Three-layer parallax background: two irregular star fields and a skyline silhouette
-- Sprite multiplexer with up to 37 virtual sprites
+- Sprite multiplexer with up to 37 virtual sprites, player shots drawn as characters
 - Own SID music player with title, stage, boss and ending music plus sound effects
 - Disk version with fastloader, Magic Desk cartridge, single PRG and turbo tape
 
@@ -83,7 +83,10 @@ In game mode, an IRQ chain runs every frame:
 - **Multiplexer IRQs:** whenever a hardware sprite is free again, it is reused for the next virtual sprite further down the screen.
 - **Split IRQ (line 221):** switches to a fixed text mode for the HUD, takes over the next frame's data prepared by the main loop (double buffered with a `ready` flag), writes the sprites whose hardware sprite is free from the top of the next frame, shifts the colour RAM at a coarse step, rotates the parallax layers and plays music and sound.
 
-The main loop collects up to 37 virtual sprites per frame (ship, orb, eight player bullets, ten enemies, eight enemy bullets, nine boss parts). Every object has a fixed slot in this list, so the order by Y coordinate from the last frame is kept and an insertion sort only has to move what changed. Then the hardware sprites are assigned. They wait in a queue in the order in which they get free: the next virtual sprite always takes the first one, and it goes back to the end of the queue, so the raster lines of the rewrites grow along the list. A hardware sprite is reused only if it is free at least three lines before the new sprite starts, and only if the interrupt chain can still make the write in time (it is planned with three raster lines per write). When no hardware sprite fits, a boss part or the ship takes over the one of a bullet or an enemy, so the big three-by-three bosses are always complete. The interrupts only have to look up the prepared entries and write the sprite registers.
+The main loop collects up to 37 virtual sprites per frame (ship, orb, eight player bullets, ten enemies, eight enemy bullets, nine boss parts; of the player bullets only homing missiles and the charge beam are sprites). Every object has a fixed slot in this list, so the order by Y coordinate from the last frame is kept and an insertion sort only has to move what changed. Then the hardware sprites are assigned. They wait in a queue in the order in which they get free: the next virtual sprite always takes the first one, and it goes back to the end of the queue, so the raster lines of the rewrites grow along the list. A hardware sprite is reused only if it is free at least three lines before the new sprite starts, and only if the interrupt chain can still make the write in time (it is planned with three raster lines per write). When no hardware sprite fits, a boss part, the ship or the orb takes over the one of a bullet or an enemy, so the big three-by-three bosses are always complete and the ship and the orb never flicker. The interrupts only have to look up the prepared entries and write the sprite registers.
+
+## Player Shots as Characters
+Pulse, laser and spread shots are not sprites but characters in the playfield, which takes most of the load off the multiplexer. They move two characters (16 pixels) to the right per frame; spread shots also move zero, one or two rows up or down, so no pixel-shifted characters are needed. Each shot remembers the character under it. At the start of the main loop, before the screen shift copies the visible screen into the back buffer, all shots are taken out of the screen again; after the movement, they are drawn into the screen of the next frame. Both happens while the raster beam is in the lower border. A shot is stopped by terrain and hits enemies in both character cells it passed, so it cannot jump over a thin wall or a small enemy. Since the colour RAM is shifted one column at a coarse scroll step, shots drawn in that frame write their colour one column further right, and the colour cells under the shots of the old screen are repaired in the next frame.
 
 ## Sound
 The music player in `sound.asm` plays the music data created by the music compiler (`tools/music.py`) from note patterns written in Python. It supports instruments with ADSR, pulse width modulation, arpeggios, vibrato and drums. The sound effects use voice 3 and temporarily take it over from the music.
@@ -103,13 +106,13 @@ The game is written in 6502 assembler for [64tass](https://sourceforge.net/proje
 
 | File | Lines | Content |
 |:-|-:|:-|
-| `src/main.asm` | 368 | memory map, constants, variables, segment layout, includes |
-| `src/game.asm` | 292 | game flow: new game, stage start, main loop, stage logic, pause, cheat keys |
+| `src/main.asm` | 380 | memory map, constants, variables, segment layout, includes |
+| `src/game.asm` | 294 | game flow: new game, stage start, main loop, stage logic, pause, cheat keys |
 | `src/irq.asm` | 489 | menu IRQ and game IRQ chain (top, multiplexer, HUD split), parallax rotation, colour shift code generator |
 | `src/scroll.asm` | 508 | scrolling engine: level init, column generation, double-buffered screen shift, terrain lookup, level events |
-| `src/sprites.asm` | 370 | virtual sprite list, insertion sort, hardware sprite allocation for the multiplexer |
-| `src/player.asm` | 768 | player ship, terrain collision, weapons, charge beam, orb satellite |
-| `src/enemies.asm` | 1282 | enemy types, spawners, enemy bullets, power-up capsules, collisions |
+| `src/sprites.asm` | 373 | virtual sprite list, insertion sort, hardware sprite allocation for the multiplexer |
+| `src/player.asm` | 1016 | player ship, terrain collision, weapons, shots drawn as characters, charge beam, orb satellite |
+| `src/enemies.asm` | 1284 | enemy types, spawners, enemy bullets, power-up capsules, collisions |
 | `src/boss.asm` | 614 | the six end bosses, their movement and attack patterns |
 | `src/hud.asm` | 274 | score, ships, weapon, speed and beam bar display |
 | `src/screens.asm` | 923 | title screen, stage intro, game over, ending, credits, hiscore entry |

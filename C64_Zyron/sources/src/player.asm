@@ -404,6 +404,50 @@ _sety   clc
         sta pb_spr,x
         lda pbt_col,y
         sta pb_col,x
+        cpy #B_MISSILE
+        bcs _rts
+        ; ---- shots drawn as chars: cell of the shot's centre in the playfield grid
+        lda #0
+        sta pb_dhi,x
+        lda pb_y,x
+        clc
+        adc #256+10-50
+        bcc _off
+        lsr
+        lsr
+        lsr
+        cmp #PFROWS
+        bcs _off
+        sta pb_gr,x
+        lda pb_xl,x             ; centre x - 24 - xfine
+        sec
+        sbc #12
+        sta ptr2
+        lda pb_xh,x
+        sbc #0
+        sta ptr2+1
+        lda ptr2
+        sec
+        sbc xfine
+        sta ptr2
+        lda ptr2+1
+        sbc #0
+        bmi _off
+        lsr
+        lda ptr2
+        ror
+        lsr
+        lsr
+        cmp #39
+        bcs _off
+        sta pb_gc,x
+        lda pb_vy,x             ; rows per frame: half the old pixel speed
+        cmp #$80
+        ror
+        sta pb_vy,x
+_rts    rts
+_off    lda #0
+        sta pb_t,x
         rts
 pbt_dmg .byte 0,1,2,1,2,12
 pbt_spr .byte 0,SPR_PULSE,SPR_LASER,SPR_SPREAD,SPR_MISSILE,SPR_CHARGE
@@ -436,10 +480,10 @@ fire_weapon
         sta tmp1
         jsr spawn_pb
         jmp _orb
-+       lda #$fd
++       lda #$fc               ; (one char row above and below)
         sta tmp1
         jsr spawn_pb
-        lda #3
+        lda #4
         sta tmp1
         jsr spawn_pb
         jmp _orb
@@ -581,8 +625,10 @@ _lp     lda pb_t,x
         bne +
         jmp _next
 +       inc pb_age,x
-        ; homing steering
         cmp #B_MISSILE
+        bcs +
+        jmp _char
++       ; homing steering
         bne _move
         lda pb_age,x
         and #3
@@ -685,6 +731,94 @@ _next   dex
         jmp _lp
 +       rts
 
+        ; ---- shots drawn as chars: two columns per frame, 0..2 rows up or down
+_char   lda pb_age,x
+        cmp #1
+        beq _cpos               ; first frame: at the nose of the ship
+        lda nx_cshift           ; the grid moved one column on a coarse step
+        beq +
+        dec pb_gc,x
++       lda pb_gc,x
+        clc
+        adc #2
+        cmp #39
+        bcs _kill
+        sta pb_gc,x
+        lda pb_gr,x
+        clc
+        adc pb_vy,x
+        cmp #PFROWS
+        bcs _kill
+        sta pb_gr,x
+_cpos   ldy pb_gr,x             ; its cell in the screen shown next
+        lda rowlo,y
+        clc
+        adc pb_gc,x
+        sta pb_alo,x
+        lda rowhiA,y
+        adc #0
+        ldy front
+        beq +
+        clc
+        adc #(SCRB-SCRA)>>8
++       sta pb_ahi,x
+        lda pb_alo,x            ; ptr2 = cell - 41
+        sec
+        sbc #41
+        sta ptr2
+        lda pb_ahi,x
+        sbc #0
+        sta ptr2+1
+        ldy #41
+        lda (ptr2),y
+        bmi _ckill              ; terrain
+        lda pb_age,x
+        cmp #1
+        beq _cbox
+        lda pb_vy,x             ; the cell it passed
+        clc
+        adc #2
+        tay
+        lda pass_ofs,y
+        tay
+        lda (ptr2),y
+        bmi _ckill
+_cbox   lda pb_gc,x             ; box: the cell passed and the cell (cx2 units)
+        asl
+        asl
+        sta tmp0
+        lda xfine
+        lsr
+        sec                     ; + 8
+        adc #7
+        adc tmp0
+        sta pb_x0,x
+        adc #8
+        sta pb_x1,x
+        lda pb_gr,x             ; y of the row: 50 + 8 row
+        asl
+        asl
+        asl
+        adc #50
+        sta tmp0
+        lda pb_vy,x
+        clc
+        adc #2
+        tay
+        lda tmp0
+        clc
+        adc pass_y0,y
+        sta pb_y0,x
+        lda tmp0
+        clc
+        adc pass_y1,y
+        sta pb_y1,x
+        jmp _next
+_ckill  jmp _kill
+pass_ofs .byte 41+39, 41-1, 41-1, 41-1, 41-41     ; by rows per frame -2..2
+pass_y0  .byte 1, 1, 1, 1, $f9
+pass_y1  .byte 14, 6, 6, 6, 6
+
 ; returns A = y of a target (boss or first live enemy), $ff if none
 find_target
         lda b_on
@@ -766,3 +900,117 @@ update_orb
         adc #10
         sta ocy
 _r      rts
+
+; ---------------------------------------------------- shots drawn as chars
+; Called before scroll_update: takes the shots of the last frame out of the
+; screen. On a coarse scroll step the old screen is still shown this frame and
+; gets overwritten later by the screen shift, so the chars stay; only their
+; colour RAM cells are repaired in the next frame, after the colour shift.
+shots_erase
+        ldx nfix                ; colour cells left from the last coarse step
+        beq _nofix
+-       dex
+        lda fix_lo,x
+        sta ptr2
+        lda fix_hi,x
+        sta ptr2+1
+        lda fix_c,x
+        ldy #0
+        sta (ptr2),y
+        txa
+        bne -
+        stx nfix
+_nofix  lda scrolling
+        beq _erase
+        lda xfine
+        bne _erase
+        ; ---- coarse step this frame
+        ldx #N_PB-1
+_cl     lda pb_dhi,x
+        beq _cn
+        ldy nfix
+        lda pb_dlo,x            ; colour cell one column left (after the shift)
+        sec
+        sbc #1
+        sta fix_lo,y
+        lda pb_dhi,x
+        and #3
+        ora #$d8
+        sbc #0
+        sta fix_hi,y
+        lda pb_bg,x
+        tay
+        lda charcol,y
+        ldy nfix
+        sta fix_c,y
+        inc nfix
+        lda #0
+        sta pb_dhi,x
+_cn     dex
+        bpl _cl
+        rts
+_erase  ldx #N_PB-1
+_el     lda pb_dhi,x
+        beq _en
+        sta ptr2+1
+        and #3
+        ora #$d8
+        sta ptr3+1
+        lda pb_dlo,x
+        sta ptr2
+        sta ptr3
+        ldy pb_bg,x
+        lda charcol,y
+        ldy #0
+        sta (ptr3),y
+        lda pb_bg,x
+        sta (ptr2),y
+        tya
+        sta pb_dhi,x
+_en     dex
+        bpl _el
+        rts
+
+; Called after update_pbullets: draws the shots into the screen shown next.
+shots_draw
+        ldx #N_PB-1
+_lp     lda pb_t,x
+        beq _nx
+        cmp #B_MISSILE
+        bcs _nx
+        tay
+        lda shot_gly-1,y
+        sta tmp0
+        lda shot_col-1,y
+        sta tmp1
+        lda pb_alo,x
+        sta ptr2
+        sta ptr3
+        lda pb_ahi,x
+        sta ptr2+1
+        and #3
+        ora #$d8
+        sta ptr3+1
+        ldy #0
+        lda (ptr2),y
+        cmp #CH_SHOT
+        bcc +
+        cmp #CH_SHOT+3
+        bcc _nx                 ; another shot is drawn there already
++       sta pb_bg,x
+        lda tmp0
+        sta (ptr2),y
+        lda nx_cshift           ; coarse step: the colour RAM moves one column
+        beq +                   ; left at the end of this frame
+        iny
++       lda tmp1
+        sta (ptr3),y
+        lda ptr2
+        sta pb_dlo,x
+        lda ptr2+1
+        sta pb_dhi,x
+_nx     dex
+        bpl _lp
+        rts
+shot_gly .byte CH_SHOT, CH_SHOT+1, CH_SHOT+2           ; pulse, laser, spread
+shot_col .byte 7, 3, 1
